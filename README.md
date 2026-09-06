@@ -1,6 +1,6 @@
 # Card Centering Grader
 
-[![tests](https://github.com/YOUR-USERNAME/card-centering-grader/actions/workflows/tests.yml/badge.svg)](https://github.com/YOUR-USERNAME/card-centering-grader/actions/workflows/tests.yml)
+[![tests](https://github.com/william-geary/card-centering-grader/actions/workflows/tests.yml/badge.svg)](https://github.com/william-geary/card-centering-grader/actions/workflows/tests.yml)
 [![licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 
 A manual centering tool for trading cards. You place eight boundary lines over
@@ -27,16 +27,24 @@ python run.py samples/sample_offset.png
 Requires Python 3.9+, Pillow and numpy (`pip install -r requirements.txt`).
 Tkinter ships with Python.
 
-### Sending it to someone who doesn't have Python
+## Download
 
-**They don't need Python, or anything else.** `python build_exe.py` produces
-`dist/CardCenteringGrader.exe` — one file, about 31 MB, with Python, Pillow,
-numpy and Tk packed inside it. Send them that file; they double-click it and
-the app opens. Nothing to install, no runtime, no admin rights, and it does not
-touch their system Python if they happen to have one.
+**[Get the latest release](https://github.com/william-geary/card-centering-grader/releases/latest)**
+— nothing to install, and you do not need Python.
 
-You only need Python on *your* machine, once, to do the build. Details in
-[Sharing it](#sharing-it).
+| Your machine | File |
+|---|---|
+| Windows 10 / 11 | `…-windows-x86_64.exe` |
+| Mac, Apple Silicon (M1–M4) | `…-macos-arm64.zip` |
+| Mac, Intel | `…-macos-x86_64.zip` |
+
+Both platforms will warn you the first time, because the app is not
+code-signed. On Windows: **More info → Run anyway**. On macOS you must
+**right-click the app → Open** rather than double-clicking it — a plain
+double-click gives a dead end. Once, then never again.
+
+Prefer to run from source? See below. Publishing your own build is covered in
+[docs/RELEASING.md](docs/RELEASING.md).
 
 ---
 
@@ -278,39 +286,41 @@ is only reachable by shortcut.
 
 ---
 
-## Sharing it
+## Building and sharing it
 
-**Your friends do not need Python installed.** `build_exe.py` wraps the app and
-everything it depends on into a single executable that runs on its own:
+`build_app.py` wraps the app and everything it needs into a single program that
+runs without Python:
 
 ```
 pip install pyinstaller
-python build_exe.py                # dist/CardCenteringGrader.exe, ~31 MB
-python build_exe.py --onedir       # a folder instead; starts faster
-python build_exe.py --console      # keep a console for debugging
+python build_app.py --package        # dist/CardCenteringGrader-1.0.0-<platform>.*
+python build_app.py --onedir         # a folder instead, starts faster
+python build_app.py --console        # keep a console, for debugging
 ```
 
-Send the single `.exe` and that is all they need. Python, Pillow, numpy and Tk
-are bundled inside it — there is nothing for them to install, no runtime to add,
-and it will not interfere with a Python they may already have. They save the
-file anywhere and double-click it.
+Python, Pillow, numpy and Tk all end up inside the binary. There is nothing for
+the recipient to install and it will not disturb a Python they already have.
+Python is needed only on the machine doing the build.
 
-Python is required only on the machine doing the build, and only for the build.
+**PyInstaller does not cross-compile.** A Windows `.exe` must be built on
+Windows and a Mac `.app` on a Mac, and a Mac build only runs on the processor
+family it was built on. So shipping both platforms means three files —
+which is why [`.github/workflows/release.yml`](.github/workflows/release.yml)
+builds all three on GitHub's machines when you push a version tag:
 
-First launch takes a few seconds while the one-file build unpacks itself into a
-temporary folder; `--onedir` avoids that at the cost of having to zip and send a
-folder instead. Windows SmartScreen may warn about an unsigned executable the
-first time — "More info" then "Run anyway" — which is normal for any program
-without a paid code-signing certificate.
+```
+git tag v1.0.0
+git push origin v1.0.0
+```
 
-PyInstaller does not cross-compile, so build the Windows executable on Windows,
-the macOS one on macOS, and so on.
+Ten minutes later the release page has a Windows `.exe`, an Apple Silicon
+`.zip` and an Intel `.zip` attached, with install instructions already written.
+[docs/RELEASING.md](docs/RELEASING.md) explains the whole thing from scratch,
+including what a release is and how to do it by hand instead.
 
-Because the packaged build has no console, an unhandled error would otherwise
-vanish silently. Anything that escapes is shown in a dialog and appended to
-`cardgrader-error.log` next to the executable.
-
----
+Do not commit the binaries. Git keeps every version of every file forever, so
+they belong in release assets, not in the repository — `dist/` is ignored for
+that reason.
 
 ## Layout
 
@@ -333,7 +343,7 @@ cardgrader/
     theme.py      dark palette
 packaging/
   make_icon.py    generates the app icon
-build_exe.py      one-file executable via PyInstaller
+build_app.py      one-file executable via PyInstaller
 tools/
   make_sample.py  synthetic card with a known centering error
   make_screenshots.py  regenerates the images in this README

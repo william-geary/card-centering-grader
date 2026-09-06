@@ -1,6 +1,10 @@
-"""Generate the application icon: a card with the two frames on it.
+"""Generate the application icons: a card with the two frames on it.
 
     python packaging/make_icon.py
+
+Writes icon.ico (Windows), icon.icns (macOS) and icon.png (everything else).
+All three are generated from the same drawing and committed, so a release
+build never has to regenerate them.
 """
 
 from __future__ import annotations
@@ -12,6 +16,7 @@ from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SIZES = (16, 24, 32, 48, 64, 128, 256)
+ICNS_SIZE = 1024        # macOS wants a big master; Pillow derives the rest
 
 BG = (30, 31, 34)
 CARD = (232, 202, 78)
@@ -47,7 +52,17 @@ def main():
                     sizes=[(n, n) for n in SIZES], append_images=frames[:-1])
     png = os.path.join(HERE, "icon.png")
     frames[-1].save(png)
-    print("wrote", ico, "and", png)
+    written = [ico, png]
+
+    icns = os.path.join(HERE, "icon.icns")
+    try:
+        draw(ICNS_SIZE).save(icns, format="ICNS")
+        written.append(icns)
+    except Exception as exc:                  # very old Pillow cannot write ICNS
+        print("could not write %s: %s" % (icns, exc))
+
+    for path in written:
+        print("wrote", path)
     return 0
 
 

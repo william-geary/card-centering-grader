@@ -1,0 +1,191 @@
+# Publishing a version, and what a GitHub release actually is
+
+Written for someone who has not done this before.
+
+## The idea
+
+Your repository holds **source code** — text files, small, versioned, diffed.
+It should not hold the 31 MB `.exe`, because git keeps every version of every
+file forever: ten releases would mean 310 MB of binaries in the history of
+anyone who clones it, and you cannot easily take them out again.
+
+A **release** is GitHub's answer to that. It is three things bundled together:
+
+1. **A tag** — a permanent bookmark on one commit, named like `v1.0.0`. It says
+   "this exact state of the code is what I shipped."
+2. **Notes** — the text people read on the release page.
+3. **Assets** — files you attach. These live outside the git history, so they
+   cost your repo nothing. This is where the `.exe` and the Mac `.zip` go.
+
+Each release gets its own page with a permanent link. That link is what you
+send people:
+
+```
+https://github.com/william-geary/card-centering-grader/releases/latest
+```
+
+They land on a page, see the download list, pick their file. They never see
+git, never install Python, never clone anything.
+
+## The catch that shapes everything else
+
+**PyInstaller cannot cross-compile.** A Windows `.exe` has to be built on
+Windows; a Mac `.app` has to be built on a Mac. And Mac builds are specific to
+the processor family — an app built on an Apple Silicon Mac will not start on
+an Intel one.
+
+So "offer both versions" means producing three files:
+
+| File | Built on |
+|---|---|
+| `…-windows-x86_64.exe` | Windows |
+| `…-macos-arm64.zip` | Apple Silicon Mac |
+| `…-macos-x86_64.zip` | Intel Mac |
+
+You own two of those machines at most. That is what the automated route below
+is for.
+
+---
+
+## Route A — let GitHub build all three (recommended)
+
+`.github/workflows/release.yml` builds every platform on GitHub's own machines
+and attaches the results to the release. You never touch a Mac to publish a Mac
+build.
+
+### One-time setup
+
+Push the repo to GitHub first:
+
+```
+git remote add origin https://github.com/william-geary/card-centering-grader.git
+git push -u origin main
+```
+
+Then on github.com, in your repo: **Settings → Actions → General →
+Workflow permissions** → select **Read and write permissions** → Save. Without
+this the workflow can run the build but cannot create the release.
+
+### Publishing
+
+Every time you want to ship a version:
+
+```
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+That is it. Pushing a tag beginning with `v` starts the workflow. Watch it on
+the **Actions** tab; it takes roughly 5–10 minutes because it is building on
+three machines. When it finishes, your release is on the **Releases** page with
+all three files attached and the install instructions already written out.
+
+### Trying it without publishing
+
+On the **Actions** tab, pick **release** → **Run workflow**. It builds all
+three and uploads them as *artifacts* (downloadable zips at the bottom of the
+run page) but does **not** create a release, because the publish step only runs
+for a real tag. Good for checking a build before you commit to a version
+number.
+
+### Version numbers
+
+The tag should match `__version__` in `cardgrader/__init__.py`, since that is
+what ends up in the filenames. Bump both together. `v1.0.1` for a fix, `v1.1.0`
+for a feature, `v2.0.0` if you change something in a way that breaks how people
+use it. Nobody will hold you to this — it is a convention, not a rule.
+
+---
+
+## Route B — build it yourself and upload by hand
+
+Useful if Actions is not set up yet, or you just want a file to hand someone
+right now.
+
+### On Windows
+
+```
+pip install -r requirements.txt pyinstaller
+python build_app.py --package
+```
+
+Produces `dist/CardCenteringGrader-1.0.0-windows-x86_64.exe`.
+
+### On your Mac
+
+Same commands. macOS ships a Python but it is old and awkward; install a
+current one from [python.org](https://www.python.org/downloads/) or via
+Homebrew (`brew install python`) first.
+
+```
+pip3 install -r requirements.txt pyinstaller
+python3 build_app.py --package
+```
+
+Produces `dist/CardCenteringGrader-1.0.0-macos-arm64.zip` (or `-x86_64` on an
+Intel Mac). The build script zips the `.app` for you with `ditto` — do not zip
+it in Finder from a script, and never with Python's `zipfile`, because both can
+lose the executable bit inside the bundle and the app then refuses to launch.
+
+**Check your own build before sending it**: unzip it somewhere else on your
+Mac and open it. If it works for you, it will work for them, modulo the
+Gatekeeper step below.
+
+### Uploading
+
+On github.com: **Releases** → **Draft a new release** → **Choose a tag** → type
+`v1.0.0` → *Create new tag on publish* → drag your files into the assets box →
+paste the contents of [`docs/release-notes.md`](release-notes.md) into the
+description → **Publish release**.
+
+---
+
+## What your friends will hit
+
+Both platforms will warn them, because the apps are unsigned. Signing costs
+money — roughly $100–400/year for a Windows certificate, $99/year for Apple's
+developer programme — and for a tool you are giving to friends it is usually
+not worth it. Just tell them what to expect. The release notes already do.
+
+**Windows**: "Windows protected your PC" → **More info** → **Run anyway**.
+
+**macOS**: they must **right-click the app → Open**, then confirm. Plain
+double-clicking gives a dead-end "Apple could not verify this app is free of
+malware" dialog with only a Cancel button, and this is the single most common
+reason someone gives up. Say it explicitly when you send the link.
+
+If a Mac friend is really stuck:
+
+```
+xattr -d com.apple.quarantine /Applications/CardCenteringGrader.app
+```
+
+## Setting up your Mac to work on the code
+
+```
+git clone https://github.com/william-geary/card-centering-grader.git
+cd card-centering-grader
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python run.py
+```
+
+If the window opens but looks wrong or Tk complains, macOS's bundled Tcl/Tk is
+the usual cause — install Python from python.org rather than using the system
+one, or `brew install python-tk`.
+
+The app itself is the same code on both platforms. The only place that branches
+on the operating system is which modifier key counts as Alt
+(`cardgrader/ui/canvas.py`), and which icon format the build uses.
+
+## If a release goes wrong
+
+Delete the release on the Releases page, then delete the tag and push again:
+
+```
+git tag -d v1.0.0
+git push origin :refs/tags/v1.0.0
+```
+
+Then fix, re-tag, re-push. Nobody minds; a release that existed for ten minutes
+is not history anyone will miss.

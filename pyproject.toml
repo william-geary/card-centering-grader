@@ -23,8 +23,8 @@ classifiers = [
 dependencies = ["pillow>=9.0", "numpy>=1.20"]
 
 [project.urls]
-Homepage = "https://github.com/wgeary/card-centering-grader"
-Issues = "https://github.com/wgeary/card-centering-grader/issues"
+Homepage = "https://github.com/william-geary/card-centering-grader"
+Issues = "https://github.com/william-geary/card-centering-grader/issues"
 
 [project.gui-scripts]
 cardgrader = "cardgrader.ui.app:main"
