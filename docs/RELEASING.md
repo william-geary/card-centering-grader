@@ -40,7 +40,7 @@ So "offer both versions" means producing three files:
 |---|---|
 | `…-windows-x86_64.exe` | Windows |
 | `…-macos-arm64.zip` | Apple Silicon Mac |
-| `…-macos-x86_64.zip` | Intel Mac |
+| `…-macos-x86_64.zip` | Intel Mac (GitHub's `macos-15-intel` runner) |
 
 You own two of those machines at most. That is what the automated route below
 is for.
