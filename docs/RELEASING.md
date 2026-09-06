@@ -55,16 +55,73 @@ build.
 
 ### One-time setup
 
-Push the repo to GitHub first:
+You only do this once, and the order matters: **the repository has to exist on
+GitHub before any of its settings do.** If you go looking for Actions settings
+before pushing, there is nothing there to find — that is the usual reason this
+step feels broken.
+
+#### 1. Create an empty repository on GitHub
+
+Go to **[github.com/new](https://github.com/new)** and fill in:
+
+- **Repository name**: `card-centering-grader`
+  (the README and `pyproject.toml` already link to this name — if you pick a
+  different one, update the links in those two files)
+- **Public** — this matters. Release downloads from a *private* repo require
+  the person downloading to be signed in and have access, which defeats the
+  point of sending a friend a link.
+- **Leave every checkbox unticked.** Do not add a README, a `.gitignore` or a
+  licence: you already have all three locally, and letting GitHub create them
+  makes a commit that collides with your first push.
+
+Click **Create repository**. You land on a near-empty page of setup commands —
+that is expected.
+
+#### 2. Push your code up
+
+In a terminal, from the project folder:
 
 ```
 git remote add origin https://github.com/william-geary/card-centering-grader.git
 git push -u origin main
 ```
 
-Then on github.com, in your repo: **Settings → Actions → General →
-Workflow permissions** → select **Read and write permissions** → Save. Without
-this the workflow can run the build but cannot create the release.
+A browser window will open asking you to sign in to GitHub. That is Git
+Credential Manager, which ships with Git for Windows; sign in and authorise it
+and it will remember you from then on.
+
+If instead the terminal asks for a *password*, note that GitHub stopped
+accepting account passwords in 2021. Go to
+**[github.com/settings/tokens](https://github.com/settings/tokens)** →
+*Generate new token (classic)* → tick the **repo** scope → generate → copy it,
+and paste that token where it asks for the password.
+
+Refresh the repository page and your files will be there.
+
+#### 3. Let Actions create releases
+
+Now the settings exist. Go to:
+
+**https://github.com/william-geary/card-centering-grader/settings/actions**
+
+or navigate there by hand:
+
+1. Open your repository page.
+2. Click **Settings** — the last tab in the row along the top
+   (Code · Issues · Pull requests · Actions · Projects · Wiki · Security ·
+   Insights · **Settings**), with a gear icon. If you cannot see it, you are
+   either signed out or looking at somebody else's copy.
+3. In the **left sidebar**, under *Code and automation*, click **Actions** to
+   expand it, then click **General**.
+4. Scroll to the bottom, to the **Workflow permissions** section.
+5. Select **Read and write permissions**.
+6. Click **Save**.
+
+Without this the workflow can build the apps but is not allowed to publish the
+release, and the last step fails with a 403.
+
+> Do not confuse the repository's Settings tab with your account settings at
+> `github.com/settings`. The workflow permission lives on the repository.
 
 ### Publishing
 
@@ -76,9 +133,10 @@ git push origin v1.0.0
 ```
 
 That is it. Pushing a tag beginning with `v` starts the workflow. Watch it on
-the **Actions** tab; it takes roughly 5–10 minutes because it is building on
-three machines. When it finishes, your release is on the **Releases** page with
-all three files attached and the install instructions already written out.
+the **Actions** tab of your repository: a run called *release* appears within a
+few seconds and takes roughly 5–10 minutes, because it is building on three
+machines at once. When it finishes, your release is on the **Releases** page
+with all three files attached and the install instructions already written out.
 
 ### Trying it without publishing
 
