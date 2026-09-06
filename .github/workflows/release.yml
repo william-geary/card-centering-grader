@@ -87,9 +87,15 @@ jobs:
     name: publish
     needs: build
     runs-on: ubuntu-latest
-    # Only publish for a real tag. A manual run still builds and uploads the
-    # artifacts so you can download and try them, but creates no release.
-    if: startsWith(github.ref, 'refs/tags/')
+    # `needs: build` on its own would skip this whole job if ANY platform in
+    # the matrix failed, so one broken Mac build would mean no release at all --
+    # not even the Windows .exe that built perfectly well. `!cancelled()` lets
+    # the job run anyway and ship whatever did build; the guard below fails
+    # loudly if that turns out to be nothing.
+    #
+    # Only publish for a real tag: a manual run still builds and uploads
+    # artifacts to try, but creates no release.
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -98,13 +104,34 @@ jobs:
           path: artifacts
 
       - name: Show what will be published
-        run: ls -lR artifacts
+        run: ls -lR artifacts || true
 
-      - name: Create the release
+      - name: Check something actually built
+        run: |
+          count=$(find artifacts -type f -name 'CardCenteringGrader-*' | wc -l)
+          echo "found $count built app(s)"
+          if [ "$count" -eq 0 ]; then
+            echo "::error::No apps were built - every platform failed. See the build jobs above."
+            exit 1
+          fi
+          if [ "$count" -lt 3 ]; then
+            echo "::warning::Only $count of 3 platforms built. Releasing those; check the failed build job."
+          fi
+
+      - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" \
-            artifacts/*/CardCenteringGrader-* \
-            --title "Card Centering Grader ${{ github.ref_name }}" \
-            --notes-file docs/release-notes.md
+          tag="${{ github.ref_name }}"
+          # The release may already exist -- because a previous run made it, or
+          # because it was created by hand in the web UI. A hand-made release
+          # has no files attached, so upload into it rather than failing.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; uploading the apps into it."
+            gh release upload "$tag" artifacts/*/CardCenteringGrader-* --clobber
+          else
+            gh release create "$tag" artifacts/*/CardCenteringGrader-* \
+              --title "Card Centering Grader $tag" \
+              --notes-file docs/release-notes.md
+          fi
+          echo "Done: $(gh release view "$tag" --json url --jq .url)"
