@@ -1,0 +1,20 @@
+# Build output
+build/
+dist/
+*.spec
+*.egg-info/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Working files
+shots/
+cardgrader-error.log
+*.cgs.json
+
+# OS
+.DS_Store
+Thumbs.db
