@@ -70,34 +70,27 @@ GitHub's answer is a **noreply address**. This repository is already set to use
 one:
 
 ```
-git config --local user.email      # william-geary@users.noreply.github.com
+git config --local user.email      # 268057230+william-geary@users.noreply.github.com
 ```
 
 That covers commits made here. Two things still worth doing on github.com:
 
 1. **[Settings → Emails](https://github.com/settings/emails)** → tick
    **Keep my email addresses private**. The page then shows your personal
-   noreply address, in the form `1234567+william-geary@users.noreply.github.com`.
+   noreply address, in the form `268057230+william-geary@users.noreply.github.com`.
 2. On the same page, tick **Block command line pushes that expose my email**.
    GitHub will then *refuse* any push whose commits carry your real address —
    a safety net rather than something you have to remember.
 
-If the address on that page has a number in front (newer accounts do), point
-this repo at the exact one so your commits also get linked to your profile:
-
-```
-git config --local user.email "1234567+william-geary@users.noreply.github.com"
-```
-
-Either form keeps your real address private; the numbered one additionally
-attributes the commits to you on GitHub.
+That noreply address is the one this repo commits as, so commits show up as
+yours on GitHub without your real address ever appearing.
 
 **Your other projects are not covered.** The setting above is local to this
 repository, and your global git config still has a real address in it. To
 default every future repository to the private one:
 
 ```
-git config --global user.email "1234567+william-geary@users.noreply.github.com"
+git config --global user.email "268057230+william-geary@users.noreply.github.com"
 ```
 
 ##### If a real address is already in the history
