@@ -60,7 +60,72 @@ GitHub before any of its settings do.** If you go looking for Actions settings
 before pushing, there is nothing there to find — that is the usual reason this
 step feels broken.
 
-#### 1. Create an empty repository on GitHub
+#### 1. Keep your email address out of it
+
+Every git commit records an author email, and on a public repository that is
+visible forever to anyone — including scrapers. It is baked into the commit,
+so it cannot be quietly edited later once other people have cloned you.
+
+GitHub's answer is a **noreply address**. This repository is already set to use
+one:
+
+```
+git config --local user.email      # william-geary@users.noreply.github.com
+```
+
+That covers commits made here. Two things still worth doing on github.com:
+
+1. **[Settings → Emails](https://github.com/settings/emails)** → tick
+   **Keep my email addresses private**. The page then shows your personal
+   noreply address, in the form `1234567+william-geary@users.noreply.github.com`.
+2. On the same page, tick **Block command line pushes that expose my email**.
+   GitHub will then *refuse* any push whose commits carry your real address —
+   a safety net rather than something you have to remember.
+
+If the address on that page has a number in front (newer accounts do), point
+this repo at the exact one so your commits also get linked to your profile:
+
+```
+git config --local user.email "1234567+william-geary@users.noreply.github.com"
+```
+
+Either form keeps your real address private; the numbered one additionally
+attributes the commits to you on GitHub.
+
+**Your other projects are not covered.** The setting above is local to this
+repository, and your global git config still has a real address in it. To
+default every future repository to the private one:
+
+```
+git config --global user.email "1234567+william-geary@users.noreply.github.com"
+```
+
+##### If a real address is already in the history
+
+Fix it *before* pushing — afterwards it is public and rewriting means
+force-pushing over anyone who cloned. Nothing here has been pushed, so this is
+safe today:
+
+```
+git config --local user.email "YOUR-NOREPLY-ADDRESS"
+FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --env-filter '
+  export GIT_AUTHOR_EMAIL="YOUR-NOREPLY-ADDRESS"
+  export GIT_COMMITTER_EMAIL="YOUR-NOREPLY-ADDRESS"
+' -- --all
+
+# filter-branch keeps the old commits as backups; these two lines drop them,
+# and without this the old address is still in the repo and still gets pushed
+git for-each-ref --format="%(refname)" refs/original/ | xargs -n1 git update-ref -d
+git reflog expire --expire=now --all && git gc --prune=now
+```
+
+Check it worked:
+
+```
+git log --format="%an <%ae>"
+```
+
+#### 2. Create an empty repository on GitHub
 
 Go to **[github.com/new](https://github.com/new)** and fill in:
 
@@ -77,7 +142,7 @@ Go to **[github.com/new](https://github.com/new)** and fill in:
 Click **Create repository**. You land on a near-empty page of setup commands —
 that is expected.
 
-#### 2. Push your code up
+#### 3. Push your code up
 
 In a terminal, from the project folder:
 
@@ -98,7 +163,7 @@ and paste that token where it asks for the password.
 
 Refresh the repository page and your files will be there.
 
-#### 3. Let Actions create releases
+#### 4. Let Actions create releases
 
 Now the settings exist. Go to:
 
