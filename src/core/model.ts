@@ -144,20 +144,21 @@ export class CardModel {
    */
   resetLines(auto = true): void {
     if (!this.image) return;
-    // Detection only needs ~900 px, so shrink before rotating: far cheaper on
-    // a phone than rotating a full-resolution photo.
-    const s = Math.min(1, DETECT_MAX / Math.max(this.image.width, this.image.height));
-    const small = s < 1
-      ? resizeRaster(this.image, Math.max(8, Math.round(this.image.width * s)),
-          Math.max(8, Math.round(this.image.height * s)))
-      : this.image;
-    const sx = small.width / this.image.width;
-    const sy = small.height / this.image.height;
-
-    let src = small;
+    let src = this.image;
+    let sx = 1;
+    let sy = 1;
     let mapper: ViewTransform | null = null;
     if (Math.abs(this.transform.angle) >= 0.005) {
-      const r = rotateExpand(small, this.transform.angle);
+      // Detection only needs ~900 px, so shrink before rotating: far cheaper on
+      // a phone than rotating a full-resolution photo. Unrotated images skip
+      // this and let detectFrames downscale, exactly as the Python app did.
+      const s = Math.min(1, DETECT_MAX / Math.max(src.width, src.height));
+      if (s < 1) {
+        src = resizeRaster(src, Math.max(8, Math.round(src.width * s)), Math.max(8, Math.round(src.height * s)));
+        sx = src.width / this.image.width;
+        sy = src.height / this.image.height;
+      }
+      const r = rotateExpand(src, this.transform.angle);
       src = r.raster;
       mapper = r.mapper;
     }

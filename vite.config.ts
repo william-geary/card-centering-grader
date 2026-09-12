@@ -1,12 +1,15 @@
+import { readFileSync } from "node:fs";
 import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig } from "vitest/config";
 
 // GitHub Pages serves the site from /<repo>/; Tauri and local previews serve it
 // from the root. The Pages workflow sets PAGES_BASE.
 const base = process.env.PAGES_BASE ?? "./";
+const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
 export default defineConfig({
   base,
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   clearScreen: false,
   server: { port: 1420, strictPort: true }, // the port tauri.conf.json expects
   build: { target: "es2022", sourcemap: true },

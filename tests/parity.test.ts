@@ -188,4 +188,22 @@ describe("auto-detect", () => {
     box.outer.forEach((v, i) => near(v, ref.box.outer[i], 1e-12));
     box.inner.forEach((v, i) => near(v, ref.box.inner[i], 1e-12));
   });
+
+  it("places the same starting lines when a card is opened", () => {
+    // Opening a card is what users actually do, and it must land on the same
+    // lines as the Python app, not just the same detector output.
+    const [ref] = fixture("autodetect.json");
+    const m = new CardModel();
+    m.load(loadPng(SAMPLE_OFFSET), "sample", [1000, 800], true);
+    const [ox0, oy0, ox1, oy1] = ref.box.outer;
+    const [ix0, iy0, ix1, iy1] = ref.box.inner;
+    near(m.lines!.outer_left.p1[0], ox0, 1e-12);
+    near(m.lines!.outer_top.p1[1], oy0, 1e-12);
+    near(m.lines!.outer_right.p1[0], ox1, 1e-12);
+    near(m.lines!.outer_bottom.p1[1], oy1, 1e-12);
+    near(m.lines!.inner_left.p1[0], ix0, 1e-12);
+    near(m.lines!.inner_top.p1[1], iy0, 1e-12);
+    near(m.lines!.inner_right.p1[0], ix1, 1e-12);
+    near(m.lines!.inner_bottom.p1[1], iy1, 1e-12);
+  });
 });

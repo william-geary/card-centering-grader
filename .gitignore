@@ -25,3 +25,5 @@ dev-dist/
 src-tauri/target/
 src-tauri/gen/schemas/
 *.local
+test-results/
+playwright-report/
