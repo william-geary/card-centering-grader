@@ -1,0 +1,53 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Card Centering Grader",
+  "mainBinaryName": "card-centering-grader",
+  "version": "../package.json",
+  "identifier": "com.williamgeary.cardcenteringgrader",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Card Centering Grader",
+        "width": 1320,
+        "height": 880,
+        "minWidth": 900,
+        "minHeight": 620,
+        "resizable": true,
+        "center": true,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; worker-src 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "William Geary",
+    "copyright": "Copyright (c) 2026 William Geary. MIT licence.",
+    "category": "Utility",
+    "shortDescription": "Measure trading card centering",
+    "longDescription": "Place boundary lines over a scan or photo of each side of a trading card and get left/right and top/bottom centering with the best grade that centering allows.",
+    "homepage": "https://github.com/william-geary/card-centering-grader",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": { "installMode": "currentUser" }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    }
+  }
+}

@@ -14,8 +14,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
-    "test:e2e": "playwright test",
-    "test:all": "npm run typecheck && npm test && npm run test:e2e"
+    "test:e2e": "playwright test --project=desktop --project=phone",
+    "test:all": "npm run typecheck && npm test && npm run test:e2e",
+    "docs:screenshots": "playwright test --project=docs"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

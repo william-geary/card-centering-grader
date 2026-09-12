@@ -1,0 +1,33 @@
+[package]
+name = "card-centering-grader"
+version = "2.0.0"
+description = "Manual trading card centering measurement"
+authors = ["William Geary"]
+license = "MIT"
+repository = "https://github.com/william-geary/card-centering-grader"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+# The _lib suffix keeps the library from clashing with the binary's name on
+# Windows, where both would otherwise produce card_centering_grader.* files.
+name = "card_centering_grader_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+# Smaller download: the app does its work in the webview, not in Rust.
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

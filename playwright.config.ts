@@ -19,11 +19,13 @@ export default defineConfig({
     timeout: 120_000,
   },
   projects: [
-    { name: "desktop", use: { channel, viewport: { width: 1440, height: 900 } } },
+    { name: "desktop", use: { channel, viewport: { width: 1440, height: 900 } }, grepInvert: /@docs/ },
     {
       name: "phone",
       use: { ...devices["Pixel 7"], channel, defaultBrowserType: "chromium" },
       grep: /@phone/,
     },
+    // Regenerates the README images: npm run docs:screenshots
+    { name: "docs", use: { channel, viewport: { width: 1440, height: 900 } }, grep: /@docs/ },
   ],
 });

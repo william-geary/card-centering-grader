@@ -1,56 +1,63 @@
-## Download
+## Two ways to use it
 
-Pick the file for your machine, from **Assets** below.
+**In your browser — nothing to install.** Works on Windows, Mac, iPhone, iPad
+and Android:
 
-| Your machine | File |
+**https://william-geary.github.io/card-centering-grader/**
+
+On a phone you can add it to your home screen and it then opens like an app
+and works offline — on iPhone: Share → *Add to Home Screen*; on Android: the
+browser menu → *Install app*.
+
+**As a desktop app** — download from **Assets** below:
+
+| Your computer | File |
 |---|---|
-| Windows 10 or 11 | `CardCenteringGrader-…-windows-x86_64.exe` |
-| Mac with Apple Silicon (M1/M2/M3/M4) | `CardCenteringGrader-…-macos-arm64.zip` |
-| Mac with an Intel processor | `CardCenteringGrader-…-macos-x86_64.zip` |
+| Windows 10 or 11 — installs with a Start-menu shortcut | `CardCenteringGrader-…-windows-x64-setup.exe` |
+| Windows 10 or 11 — no install, just run it | `CardCenteringGrader-…-windows-x64-portable.exe` |
+| Any Mac, Apple Silicon or Intel | `CardCenteringGrader-…-macos-universal.dmg` |
 
-Not sure which Mac you have?  → About This Mac. "Chip: Apple M…" means Apple
-Silicon; "Processor: Intel…" means Intel.
-
-Nothing to install. You do not need Python.
+Your images never leave your device in either version.
 
 ### Windows
 
-Download the `.exe`, put it anywhere, double-click it.
+Run the setup file, or put the portable one anywhere and double-click it. No
+administrator rights needed.
 
 The first time, Windows may show **"Windows protected your PC"**. That appears
-for any program without a paid code-signing certificate. Click **More info**,
+for any program without a paid code-signing certificate: click **More info**,
 then **Run anyway**.
 
-### macOS
+The portable version relies on Microsoft Edge WebView2, which Windows 11 and
+up-to-date Windows 10 already have. If it won't start, use the setup file,
+which installs WebView2 if it is missing.
 
-1. Download the `.zip` and double-click it to unpack `CardCenteringGrader.app`.
-2. Drag the app to your Applications folder.
-3. **Right-click the app and choose Open**, then click **Open** in the dialog.
+### Mac
 
-That third step matters. Double-clicking an app downloaded from the internet
-that has not been notarised by Apple gets you *"Apple could not verify …is free
-of malware"* with no obvious way past it. Right-click → Open is the way to
-approve it, and you only do it once.
+1. Open the `.dmg` and drag **Card Centering Grader** into **Applications**.
+2. Open it. macOS will say it cannot verify the app — click **Done**
+   (not *Move to Bin*).
+3. Open **System Settings → Privacy & Security**, scroll down, and click
+   **Open Anyway** next to Card Centering Grader. Confirm with your password.
 
-On newer macOS you may instead need: System Settings → Privacy & Security →
-scroll down → **Open Anyway**.
+You only do this once. It happens because the app is not notarised by Apple,
+which needs a paid developer account. (On macOS 14 and earlier, right-click the
+app → **Open** also works; macOS 15 removed that shortcut.)
 
-If it still refuses, open Terminal and run:
+If macOS says the app **"is damaged"**, open Terminal and run:
 
 ```
-xattr -d com.apple.quarantine /Applications/CardCenteringGrader.app
+xattr -dr com.apple.quarantine "/Applications/Card Centering Grader.app"
 ```
-
-The first launch takes a few seconds while the app unpacks itself. Later
-launches are quick.
 
 ## Using it
 
-Open the front of a card, straighten it, place the eight lines, then switch to
-**Back** and do the same. The panel shows Left/Right and Top/Bottom centering
-live, plus the best grade the centering allows for PSA, BGS and CGC.
+Open the front of a card, place the eight lines, then switch to **Back** and do
+the same. You get Left/Right and Top/Bottom centering live, plus the best grade
+the centering allows for PSA, BGS and CGC. Photographed a card with your phone?
+Use the **Perspective** stage first.
 
-Full instructions: see the [README](https://github.com/william-geary/card-centering-grader#readme).
+Full guide: the [README](https://github.com/william-geary/card-centering-grader#readme).
 
 Centering only — corners, edges and surface are not assessed, so treat the
 grade as a ceiling and a sanity check, not a prediction. Not affiliated with

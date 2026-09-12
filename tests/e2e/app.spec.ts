@@ -198,6 +198,19 @@ test("saves a session and reopens it in a fresh window", async ({ page, context 
   expect(reopenedAngle).toBeCloseTo(2.5, 6);
 });
 
+test("keeps working offline once it has been opened", async ({ page, context }) => {
+  // The service worker precaches the app on the first visit; after one reload
+  // the page is served through it.
+  await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  await context.setOffline(true);
+  await page.reload();
+  await page.getByRole("button", { name: "Try the sample card" }).click();
+  await expect(page.locator(".big").first()).toHaveText("57.6 / 42.4");
+  await context.setOffline(false);
+});
+
 test("works on a phone, with pinch to zoom @phone", async ({ page }, info) => {
   test.skip(info.project.name !== "phone", "phone layout only");
   await page.getByRole("button", { name: "Try the sample card" }).click();

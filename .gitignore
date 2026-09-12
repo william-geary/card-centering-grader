@@ -1,29 +1,18 @@
-# Build output
-build/
+# Dependencies and build output
+node_modules/
 dist/
-*.spec
-*.egg-info/
+dev-dist/
+src-tauri/target/
+src-tauri/gen/schemas/
 
-# Python
-__pycache__/
-*.pyc
-.venv/
-venv/
+# Test output
+test-results/
+playwright-report/
 
 # Working files
-shots/
-cardgrader-error.log
 *.cgs.json
+*.local
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Web / Tauri
-node_modules/
-dev-dist/
-src-tauri/target/
-src-tauri/gen/schemas/
-*.local
-test-results/
-playwright-report/
