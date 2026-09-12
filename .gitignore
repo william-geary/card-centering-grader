@@ -18,3 +18,10 @@ cardgrader-error.log
 # OS
 .DS_Store
 Thumbs.db
+
+# Web / Tauri
+node_modules/
+dev-dist/
+src-tauri/target/
+src-tauri/gen/schemas/
+*.local
