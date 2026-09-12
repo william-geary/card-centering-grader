@@ -14,10 +14,30 @@ import {
 import { $, clear, h, typingInField } from "./dom";
 import { renderSession } from "./export";
 import { DEFAULT_SCHEME, SCHEME_NAMES, type SchemeName, schemeColors } from "./palette";
-import { CardView, STAGES, STAGE_TITLES, type Stage } from "./view";
+import { CardView, STAGES, STAGE_TITLES, type Stage, stageHints } from "./view";
 
 const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/heic,image/heif,image/bmp,image/tiff,image/*";
 const SAMPLE_URL = `${import.meta.env.BASE_URL}samples/sample_offset.png`;
+
+/** Phones, and phones held sideways. Tablets keep the desktop layout. */
+const MOBILE_QUERY = "(max-width: 760px), (max-height: 520px) and (pointer: coarse)";
+
+type Sheet = "results" | "options";
+
+// Bottom-navigation icons: simple strokes in currentColor.
+const svg = (d: string) =>
+  `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" `
+  + `stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+const NAV_ICONS: Record<Stage | "results", string> = {
+  perspective: svg("M6 5l13 2v12L5 18z"),
+  rotate: svg("M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"),
+  bulk: svg("M3 7h18M3 17h18M7 3v18M17 3v18"),
+  precision: svg("M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM20 20l-4.8-4.8M10.5 7.5v6M7.5 10.5h6"),
+  results: svg("M5 20v-8M12 20V5M19 20v-11"),
+};
+const NAV_LABELS: Record<Stage | "results", string> = {
+  perspective: "Deskew", rotate: "Rotate", bulk: "Bulk", precision: "Precision", results: "Results",
+};
 
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => setTimeout(r, 0)));
 const fmt = (v: number, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : "--");
@@ -31,10 +51,17 @@ export class App {
   private resultsPending = 0;
   private tintTimer = 0;
   private scheme: SchemeName = DEFAULT_SCHEME;
+  /** Phone layout: card full screen, navigation at the bottom. */
+  mobile = false;
+  private sheet: Sheet | null = null;
+  private toastTimer = 0;
 
   constructor(root: HTMLElement) {
     this.root = root;
     this.build();
+    const mq = matchMedia(MOBILE_QUERY);
+    mq.addEventListener("change", () => this.applyLayout(mq.matches));
+    this.applyLayout(mq.matches);
     this.bindKeys();
     this.bindDrop();
     this.renderStagePanel();
@@ -66,9 +93,13 @@ export class App {
       ["Report (JSON)", () => this.exportReport()],
     ]);
     r.moreMenu = this.menu("⋯", [
-      ["Open image…", () => this.openImage(), "Ctrl+O"],
+      ["Take a photo", () => this.takePhoto(), undefined, "mobile-only"],
+      ["Choose a photo", () => this.openImage(), undefined, "mobile-only"],
+      ["Open image…", () => this.openImage(), "Ctrl+O", "desktop-only"],
       ["Try the sample card", () => this.openSample()],
       null,
+      ["Export overlay image", () => this.exportImage(), undefined, "mobile-only"],
+      ["Export report", () => this.exportReport(), undefined, "mobile-only"],
       ["Save session…", () => this.saveSession(), "Ctrl+S"],
       ["Open session…", () => this.openSession()],
       null,
@@ -84,16 +115,16 @@ export class App {
       h("div", { class: "brand" },
         h("img", { class: "logo", src: `${import.meta.env.BASE_URL}favicon.svg`, alt: "", width: 24, height: 24 }),
         h("span", { class: "brand-name" }, "Centering Grader")),
-      btn("Open", () => this.openImage(), { class: "primary", title: "Open a card image (Ctrl+O)" }),
+      btn("Open", () => this.openImage(), { class: "primary desktop-only", title: "Open a card image (Ctrl+O)" }),
       sideSeg,
       h("div", { class: "group" },
         (r.undo = h("button", { type: "button", title: "Undo (Ctrl+Z)", "aria-label": "Undo", onclick: () => this.undo() },
           h("span", { class: "ico", "aria-hidden": "true" }, "↶"), h("span", { class: "lbl" }, "Undo"))),
         (r.redo = h("button", { type: "button", title: "Redo (Ctrl+Shift+Z)", "aria-label": "Redo", onclick: () => this.redo() },
           h("span", { class: "ico", "aria-hidden": "true" }, "↷"), h("span", { class: "lbl" }, "Redo")))),
-      btn("Home", () => this.view.home(), { title: "Centre the card (H)", class: "hide-sm" }),
+      btn("Home", () => this.view.home(), { title: "Centre the card (H)", class: "hide-sm desktop-only" }),
       h("div", { class: "spacer" }),
-      r.exportMenu,
+      h("div", { class: "desktop-only" }, r.exportMenu),
       r.moreMenu,
     );
 
@@ -114,13 +145,25 @@ export class App {
         h("h1", {}, "Measure a card's centering"),
         h("p", {}, "Open a scan or photo of the front, place the lines, then do the back. "
           + "You get left/right and top/bottom centering and the best grade that centering allows."),
-        h("div", { class: "row" },
-          btn("Open image", () => this.openImage(), { class: "primary" }),
+        h("div", { class: "row empty-actions" },
+          btn("Take a photo", () => this.takePhoto(), { class: "primary mobile-only" }),
+          (r.chooseBtn = btn("Open image", () => this.openImage(), { class: "primary" })),
           btn("Try the sample card", () => this.openSample())),
-        h("p", { class: "muted small" }, "Or drop an image here. Your images never leave this device.")));
+        h("ul", { class: "tips mobile-only" },
+          h("li", {}, "Lay the card flat on a plain, dark surface."),
+          h("li", {}, "Hold the phone directly above it and fill the frame."),
+          h("li", {}, "Avoid glare: turn off the flash, and angle away from lights.")),
+        h("p", { class: "muted small" }, h("span", { class: "desktop-only" }, "Or drop an image here. "),
+          "Your images never leave this device.")));
     r.busy = h("div", { class: "busy", hidden: true }, h("div", { class: "spinner" }), (r.busyText = h("span", {}, "Working…")));
     r.drop = h("div", { class: "drop", hidden: true }, "Drop to open");
-    host.append(r.empty, r.busy, r.drop);
+    // Phone layout: live numbers over the card, the stage's main actions above
+    // the bottom nav, and short-lived messages in place of the status bar.
+    r.chip = h("button", { type: "button", class: "chip mobile-only", hidden: true, "aria-label": "Show results",
+      onclick: () => this.toggleSheet("results") });
+    r.actions = h("div", { class: "actions mobile-only", hidden: true });
+    r.toast = h("div", { class: "toast", role: "status", hidden: true });
+    host.append(r.chip, r.actions, r.toast, r.empty, r.busy, r.drop);
     // The panels below read the view's defaults, so it has to exist first.
     this.view = new CardView(host, {
       change: () => this.scheduleResults(),
@@ -133,7 +176,11 @@ export class App {
     const advanced = this.buildAdvanced();
     const results = this.buildResults();
 
-    r.sidebar = h("aside", { class: "sidebar" }, results, this.stagePanel, advanced);
+    const sheetHead = h("div", { class: "sheet-head mobile-only" },
+      h("span", { class: "grabber", "aria-hidden": "true" }),
+      (r.sheetTitle = h("h2", {}, "")),
+      h("button", { type: "button", class: "sm", onclick: () => this.closeSheet() }, "Done"));
+    r.sidebar = h("aside", { class: "sidebar" }, sheetHead, results, this.stagePanel, advanced);
     const workspace = h("main", { class: "workspace" },
       h("section", { class: "stage-area" }, tabs, host), r.sidebar);
 
@@ -141,17 +188,29 @@ export class App {
     r.fileInfo = h("span", { class: "file-info" });
     const footer = h("footer", { class: "statusbar" }, r.status, r.fileInfo);
 
-    this.root.append(header, workspace, footer);
+    r.backdrop = h("div", { class: "backdrop", onclick: () => this.closeSheet() });
+    const nav = h("nav", { class: "mobile-nav", "aria-label": "Stages" },
+      ...[...STAGES, "results" as const].map((key) => {
+        const b = h("button", {
+          type: "button", "data-nav": key,
+          onclick: () => (key === "results" ? this.toggleSheet("results") : this.navTo(key)),
+        }, h("span", { class: "nav-ico" }), h("span", {}, NAV_LABELS[key]));
+        (b.firstElementChild as HTMLElement).innerHTML = NAV_ICONS[key]; // static markup
+        r[`nav-${key}`] = b;
+        return b;
+      }));
+
+    this.root.append(header, workspace, footer, r.backdrop, nav);
 
   }
 
-  private menu(label: string, items: Array<[string, () => void, string?] | null>, aria?: string): HTMLElement {
+  private menu(label: string, items: Array<[string, () => void, string?, string?] | null>, aria?: string): HTMLElement {
     const list = h("div", { class: "menu-list", role: "menu", hidden: true });
     for (const it of items) {
       if (!it) { list.append(h("hr")); continue; }
-      const [text, fn, key] = it;
+      const [text, fn, key, cls] = it;
       list.append(h("button", {
-        type: "button", role: "menuitem",
+        type: "button", role: "menuitem", class: cls,
         onclick: () => { list.hidden = true; fn(); },
       }, h("span", {}, text), key ? h("kbd", {}, key) : null));
     }
@@ -425,7 +484,12 @@ export class App {
       const t = r[`tab-${s}`];
       t.classList.toggle("active", s === this.view.stage);
       t.setAttribute("aria-selected", String(s === this.view.stage));
+      const n = r[`nav-${s}`];
+      n.classList.toggle("active", s === this.view.stage && this.sheet !== "results");
+      (n as HTMLButtonElement).disabled = !loaded;
     }
+    r["nav-results"].classList.toggle("active", this.sheet === "results");
+    this.root.dataset.stage = this.view.stage;
     const sc = schemeColors(this.scheme);
     r.swOuter.style.background = sc.outer;
     r.swInner.style.background = sc.inner;
@@ -448,6 +512,20 @@ export class App {
     r.centeringLabel.textContent = `Centering · ${LABELS[this.session.active]}`;
     (r.nSamples as HTMLSelectElement).value = String(c.nSamples);
     const m = c.loaded ? c.measure() : null;
+
+    // The chip over the phone canvas: both axes and the final ceiling.
+    r.chip.hidden = !c.loaded || this.view.stage === "perspective";
+    if (!r.chip.hidden) {
+      clear(r.chip);
+      const finals = this.session.finalCeilings();
+      r.chip.append(
+        h("span", { class: "chip-axes" },
+          h("span", {}, h("b", {}, "L/R "), m?.valid ? m.lr.text() : "--"),
+          h("span", {}, h("b", {}, "T/B "), m?.valid ? m.tb.text() : "--")),
+        h("span", { class: "chip-grades" },
+          finals.length ? finals.map((f) => `${f.grader} ${f.grade}`).join(" · ") : "Tap for results"));
+      r.chip.classList.toggle("caution", !!m?.valid && (m.crossed || Math.max(m.lr.spread, m.tb.spread) > 4));
+    }
 
     const setAxis = (key: "lr" | "tb", colour: string) => {
       const a = m?.[key];
@@ -529,6 +607,12 @@ export class App {
     const r = this.r;
     const v = this.view;
     const c = this.card;
+    const bar = r.actions;
+    const want = `${v.stage}|${c.loaded}|${c.flattened}|${this.mobile}`;
+    if (bar && bar.dataset.state !== want) {
+      bar.dataset.state = want;
+      this.renderActions();
+    }
     if (v.stage === "perspective" && r.perspState) {
       r.perspState.textContent = !c.loaded ? "No image" : c.flattened ? "Perspective corrected" : "Not corrected";
       r.perspState.classList.toggle("on", c.flattened);
@@ -558,6 +642,7 @@ export class App {
 
   private refreshViewReadouts(): void {
     const r = this.r;
+    if (r.mAngle?.isConnected && this.card.loaded) r.mAngle.textContent = `${this.card.transform.angle.toFixed(1)}°`;
     if (this.view.stage !== "rotate" || !r.angle?.isConnected || !this.card.loaded) return;
     const t = this.card.transform;
     if (document.activeElement !== r.angle) (r.angle as HTMLInputElement).value = String(t.angle);
@@ -568,6 +653,120 @@ export class App {
 
   status(msg: string): void {
     this.r.status.textContent = msg;
+    if (this.mobile && msg) this.toast(msg);
+  }
+
+  /** A message that fades after a few seconds; the phone layout has no status bar. */
+  private toast(msg: string, ms = 3200): void {
+    const t = this.r.toast;
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(this.toastTimer);
+    this.toastTimer = window.setTimeout(() => (t.hidden = true), ms);
+  }
+
+  // ============================================================ phone layout
+  private applyLayout(mobile: boolean): void {
+    this.mobile = mobile;
+    this.root.classList.toggle("mobile", mobile);
+    const v = this.view;
+    v.hud = !mobile;
+    // Nearly edge to edge on a phone; the chip and action bar sit over the
+    // card's surroundings, so frame the card in the space between them.
+    v.homeFill = mobile ? 0.94 : 0.88;
+    v.insets = mobile ? { top: 58, bottom: 76 } : { top: 0, bottom: 0 };
+    (this.r.chooseBtn as HTMLButtonElement).textContent = mobile ? "Choose a photo" : "Open image";
+    this.closeSheet();
+    if (this.card.loaded) v.home();
+    this.renderActions();
+    v.requestDraw();
+  }
+
+  private toggleSheet(kind: Sheet): void {
+    if (this.sheet === kind) this.closeSheet();
+    else this.openSheet(kind);
+  }
+
+  private openSheet(kind: Sheet): void {
+    if (!this.card.loaded && kind === "options") return;
+    this.sheet = kind;
+    this.root.dataset.sheet = kind;
+    this.r.sheetTitle.textContent = kind === "results" ? "Results" : `${STAGE_TITLES[this.view.stage]} options`;
+    this.r.sidebar.scrollTop = 0;
+    this.refresh();
+  }
+
+  closeSheet(): void {
+    if (!this.sheet && !this.root.dataset.sheet) return;
+    this.sheet = null;
+    delete this.root.dataset.sheet;
+    this.refresh();
+  }
+
+  private navTo(stage: Stage): void {
+    this.closeSheet();
+    if (stage === this.view.stage) return;
+    this.setStage(stage);
+    if (this.mobile && this.card.loaded) this.toast(stageHints(true)[stage], 2600);
+  }
+
+  /** The stage's main actions, floating above the bottom navigation. */
+  private renderActions(): void {
+    const bar = this.r.actions;
+    if (!bar) return;
+    clear(bar);
+    const c = this.card;
+    bar.hidden = !this.mobile || !c.loaded;
+    if (bar.hidden) return;
+    const act = (label: string, fn: () => void, cls = "") =>
+      h("button", { type: "button", class: cls, onclick: () => fn() }, label);
+    const options = act("⚙", () => this.openSheet("options"), "icon");
+    options.setAttribute("aria-label", "More options");
+
+    switch (this.view.stage) {
+      case "perspective":
+        bar.append(
+          c.flattened ? act("Remove", () => this.removeFlatten()) : act("Skip", () => this.skipDeskew()),
+          act("Reset", () => { this.view.beginPerspective(); this.view.requestDraw(); }),
+          act(c.flattened ? "Re-flatten" : "Flatten ✓", () => this.applyFlatten(), "primary grow"),
+          options);
+        break;
+      case "rotate": {
+        const angle = h("span", { class: "readout" });
+        this.r.mAngle = angle;
+        bar.append(
+          act("−0.1°", () => this.setAngle(c.transform.angle - 0.1)),
+          angle,
+          act("+0.1°", () => this.setAngle(c.transform.angle + 0.1)),
+          act("Home", () => this.view.home(), "grow"),
+          options);
+        this.refreshViewReadouts();
+        break;
+      }
+      case "bulk":
+        bar.append(
+          act("Auto-detect", () => this.autoDetect(), "primary grow"),
+          act("Straighten", () => this.straightenAll()),
+          options);
+        break;
+      case "precision":
+        bar.append(
+          act("Reset handles", () => this.placeHandles(), "grow"),
+          act("Home", () => this.view.home()),
+          options);
+        break;
+    }
+  }
+
+  private skipDeskew(): void {
+    this.setStage("bulk");
+    this.view.home();
+    this.toast("No deskew. Fine for scans; for photos, flattening first is more accurate.");
+  }
+
+  async takePhoto(): Promise<void> {
+    const f = await pickFile("image/*", "environment");
+    if (f) await this.loadInto(this.session.active, f, f.name || "photo.jpg");
   }
 
   private async busy<T>(label: string, work: () => T | Promise<T>): Promise<T> {
@@ -590,6 +789,8 @@ export class App {
 
   setSide(side: Side): void {
     if (!this.session.setActive(side)) return;
+    this.sheet = null;
+    delete this.root.dataset.sheet;
     this.view.setModel(this.session.card);
     this.renderStagePanel();
     this.refresh();
@@ -650,7 +851,16 @@ export class App {
           ? `Both sides loaded. The final ceiling uses whichever reads worse.${scaled}`
           : `Loaded the ${LABELS[side].toLowerCase()}. Place the lines, then switch to the ${other}.${scaled}`);
       });
-      if (this.view.stage === "perspective") this.view.beginPerspective();
+      if (this.mobile) {
+        // A phone photo is almost always skewed: start by squaring it up.
+        this.closeSheet();
+        if (this.view.stage === "perspective") this.view.beginPerspective();
+        else this.setStage("perspective");
+        this.view.home();
+        this.toast("Drag the corners onto the card's corners, then Flatten.", 4000);
+      } else if (this.view.stage === "perspective") {
+        this.view.beginPerspective();
+      }
       this.renderStagePanel();
       this.refresh();
     } catch (e) {

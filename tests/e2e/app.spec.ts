@@ -99,7 +99,7 @@ test("perspective correction recovers the true centering from a keystoned photo"
   const truth = CARD.map((p) => applyH(toPhoto, p));
 
   await openImage(page, photoPath);
-  await page.getByRole("tab", { name: /Perspective/ }).click();
+  await page.getByRole("tab", { name: /Deskew/ }).click();
 
   // Really drag one corner, to prove the handles respond to the pointer...
   const tl = await page.evaluate(() => {
@@ -211,36 +211,121 @@ test("keeps working offline once it has been opened", async ({ page, context }) 
   await context.setOffline(false);
 });
 
-test("works on a phone, with pinch to zoom @phone", async ({ page }, info) => {
-  test.skip(info.project.name !== "phone", "phone layout only");
-  await page.getByRole("button", { name: "Try the sample card" }).click();
-  await expect(page.locator(".big").first()).toHaveText("57.6 / 42.4");
+/** A keystoned "phone photo" of the sample card, plus where its card corners ended up. */
+function keystonedPhoto(info: { outputPath: (n: string) => string }): { path: string; corners: Quad } {
+  const png = PNG.sync.read(readFileSync(SAMPLE));
+  const W = png.width, H = png.height;
+  const full: Quad = [[0, 0], [W, 0], [W, H], [0, H]];
+  const photoCorners: Quad = [[70, 30], [W - 20, 90], [W - 60, H - 20], [30, H - 110]];
+  const photo = warpPerspective({ width: W, height: H, data: new Uint8ClampedArray(png.data) },
+    homography(photoCorners, full)!, W, H);
+  const out = new PNG({ width: W, height: H });
+  out.data = Buffer.from(photo.data);
+  const path = info.outputPath("keystoned-phone.png");
+  writeFileSync(path, PNG.sync.write(out));
+  const toPhoto = homography(full, photoCorners)!;
+  return { path, corners: CARD.map((p) => applyH(toPhoto, p)) as Quad };
+}
 
-  // Results and the canvas are both on screen at phone width.
-  await expect(page.locator(".card-canvas")).toBeInViewport();
-  await expect(page.locator(".results")).toBeInViewport();
+test.describe("phone layout", () => {
+  test.beforeEach(({}, info) => test.skip(info.project.name !== "phone", "phone layout only"));
 
-  // Two fingers moving apart.
-  const scaleBefore = await page.evaluate(() => window.cardGrader.session.card.transform.scale);
-  await page.evaluate(() => {
-    const c = window.cardGrader.view.canvas as HTMLCanvasElement;
-    const r = c.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-    const fire = (type: string, id: number, x: number, y: number) =>
-      c.dispatchEvent(new PointerEvent(type, {
-        pointerId: id, pointerType: "touch", clientX: x, clientY: y, bubbles: true, isPrimary: id === 1,
-      }));
-    fire("pointerdown", 1, cx - 30, cy);
-    fire("pointerdown", 2, cx + 30, cy);
-    for (let i = 1; i <= 10; i++) {
-      fire("pointermove", 1, cx - 30 - i * 6, cy);
-      fire("pointermove", 2, cx + 30 + i * 6, cy);
-    }
-    fire("pointerup", 1, cx - 90, cy);
-    fire("pointerup", 2, cx + 90, cy);
+  test("the card fills the screen, with navigation at the bottom @phone", async ({ page }) => {
+    await expect(page.locator(".app")).toHaveClass(/mobile/);
+    await page.getByRole("button", { name: "Try the sample card" }).click();
+    await expect(page.locator(".mobile-nav [data-nav=perspective]")).toHaveClass(/active/);
+
+    const vp = page.viewportSize()!;
+    const nav = (await page.locator(".mobile-nav").boundingBox())!;
+    expect(nav.y + nav.height).toBeGreaterThan(vp.height - 2); // pinned to the bottom
+    const canvas = (await page.locator(".card-canvas").boundingBox())!;
+    expect(canvas.height / vp.height).toBeGreaterThan(0.72);
+    await expect(page.locator(".stage-tabs")).toBeHidden();
+    await expect(page.locator(".statusbar")).toBeHidden();
+
+    // Skip deskew (it is a scan) and check the card is framed nearly edge to edge.
+    await page.getByRole("button", { name: "Skip" }).click();
+    await expect(page.locator(".mobile-nav [data-nav=bulk]")).toHaveClass(/active/);
+    const fill = await page.evaluate(() => {
+      const app = (window as any).cardGrader;
+      const m = app.session.card;
+      const pts = m.outerCorners().map((p: number[]) => m.transform.imgToView(p));
+      const xs = pts.map((p: number[]) => p[0]), ys = pts.map((p: number[]) => p[1]);
+      const [w, h] = app.view.viewSize;
+      const vis = h - app.view.insets.top - app.view.insets.bottom;
+      return Math.max((Math.max(...xs) - Math.min(...xs)) / w, (Math.max(...ys) - Math.min(...ys)) / vis);
+    });
+    expect(fill).toBeGreaterThan(0.9);
+    await expect(page.locator(".chip")).toContainText("57.6 / 42.4");
   });
-  const scaleAfter = await page.evaluate(() => window.cardGrader.session.card.transform.scale);
-  expect(scaleAfter / scaleBefore).toBeGreaterThan(2.5); // 60 px apart -> 180 px apart
-  await page.screenshot({ path: info.outputPath("phone.png") });
+
+  test("a chosen photo opens straight into deskew, and flattening gives the true centering @phone", async ({ page }, info) => {
+    const { path, corners } = keystonedPhoto(info);
+    const chooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Choose a photo" }).click();
+    await (await chooser).setFiles(path);
+    await expect(page.locator(".busy")).toBeHidden();
+
+    await expect(page.locator(".mobile-nav [data-nav=perspective]")).toHaveClass(/active/);
+    await expect(page.getByRole("button", { name: "Flatten ✓" })).toBeVisible();
+
+    // Place the corners where a careful thumb would, then flatten from the action bar.
+    await page.evaluate((q) => { (window as any).cardGrader.view.corners = q; }, corners);
+    await page.getByRole("button", { name: "Flatten ✓" }).click();
+    await expect(page.locator(".mobile-nav [data-nav=bulk]")).toHaveClass(/active/);
+
+    const lr = await page.evaluate(() => (window as any).cardGrader.session.card.measure().lr.lowPct);
+    const tb = await page.evaluate(() => (window as any).cardGrader.session.card.measure().tb.lowPct);
+    expect(Math.abs(lr - 57.0)).toBeLessThan(1.5);
+    expect(Math.abs(tb - 46.1)).toBeLessThan(1.5);
+    await page.screenshot({ path: info.outputPath("phone-after-flatten.png") });
+  });
+
+  test("results open in a sheet from the chip or the nav @phone", async ({ page }, info) => {
+    await page.getByRole("button", { name: "Try the sample card" }).click();
+    await page.getByRole("button", { name: "Skip" }).click();
+    await expect(page.locator(".results")).not.toBeInViewport();
+
+    await page.locator(".chip").click();
+    await expect(page.locator(".results")).toBeInViewport();
+    await expect(page.locator(".grades tr.final td").first()).toHaveText("9");
+    await page.screenshot({ path: info.outputPath("phone-results.png") });
+    await page.getByRole("button", { name: "Done" }).click();
+    await expect(page.locator(".results")).not.toBeInViewport();
+
+    await page.locator(".mobile-nav [data-nav=results]").click();
+    await expect(page.locator(".results")).toBeInViewport();
+    await page.locator(".backdrop").click({ position: { x: 20, y: 80 } });
+    await expect(page.locator(".results")).not.toBeInViewport();
+
+    // Stage options come up in the same sheet.
+    await page.getByRole("button", { name: "More options" }).click();
+    await expect(page.getByRole("button", { name: "Auto-detect both frames" })).toBeInViewport();
+  });
+
+  test("pinch zooms the card @phone", async ({ page }) => {
+    await page.getByRole("button", { name: "Try the sample card" }).click();
+    await page.getByRole("button", { name: "Skip" }).click();
+    const scaleBefore = await page.evaluate(() => (window as any).cardGrader.session.card.transform.scale);
+    await page.evaluate(() => {
+      const c = (window as any).cardGrader.view.canvas as HTMLCanvasElement;
+      const r = c.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const fire = (type: string, id: number, x: number, y: number) =>
+        c.dispatchEvent(new PointerEvent(type, {
+          pointerId: id, pointerType: "touch", clientX: x, clientY: y, bubbles: true, isPrimary: id === 1,
+        }));
+      fire("pointerdown", 1, cx - 30, cy);
+      fire("pointerdown", 2, cx + 30, cy);
+      for (let i = 1; i <= 10; i++) {
+        fire("pointermove", 1, cx - 30 - i * 6, cy);
+        fire("pointermove", 2, cx + 30 + i * 6, cy);
+      }
+      fire("pointerup", 1, cx - 90, cy);
+      fire("pointerup", 2, cx + 90, cy);
+    });
+    const scaleAfter = await page.evaluate(() => (window as any).cardGrader.session.card.transform.scale);
+    expect(scaleAfter / scaleBefore).toBeGreaterThan(2.5);
+  });
 });

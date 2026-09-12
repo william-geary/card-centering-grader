@@ -28,7 +28,7 @@ export type Stage = "perspective" | "rotate" | "bulk" | "precision";
 
 export const STAGES: readonly Stage[] = ["perspective", "rotate", "bulk", "precision"];
 export const STAGE_TITLES: Record<Stage, string> = {
-  perspective: "Perspective",
+  perspective: "Deskew",
   rotate: "Rotation",
   bulk: "Bulk",
   precision: "Precision",
@@ -67,6 +67,12 @@ export class CardView {
   loupeEnabled = true;
   loupeZoom = 6;
   nudgeStep = 1;
+  /** Fraction of the visible area the card fills on Home. */
+  homeFill = 0.88;
+  /** Screen space covered by overlays (the phone layout's chip and action bar). */
+  insets = { top: 0, bottom: 0 };
+  /** Draw the stage name and hints on the canvas. The phone layout shows them elsewhere. */
+  hud = true;
 
   selected: Selected | null = null;
   private hover: Selected | number | null = null;
@@ -159,7 +165,6 @@ export class CardView {
     const m = this.model!;
     const src = m.source!;
     this.perspTransform = new ViewTransform();
-    this.perspTransform.fit([src.width, src.height], this.size);
     if (m.flattenCorners) {
       this.corners = m.flattenCorners.map((p) => [...p]) as Quad;
     } else {
@@ -171,17 +176,67 @@ export class CardView {
            [src.width * 0.9, src.height * 0.9], [src.width * 0.1, src.height * 0.9]];
     }
     this.selectedCorner = null;
+    this.framePerspective();
   }
 
   // ----------------------------------------------------------------- framing
+  /** The part of the view not covered by overlays, and its size. */
+  private get visible(): { size: Vec; top: number } {
+    const top = this.insets.top;
+    return { size: [this.size[0], Math.max(1, this.size[1] - top - this.insets.bottom)], top };
+  }
+
+  /** Fit a whole image into the visible area, keeping the transform's angle. */
+  private fitInto(t: ViewTransform, img: Raster, margin: number): void {
+    const { size, top } = this.visible;
+    const angle = t.angle;
+    t.fit([img.width, img.height], size, margin);
+    t.angle = angle;
+    t.pan = [t.pan[0], t.pan[1] + top];
+  }
+
+  /**
+   * Deskew framing: fill the view with the card's corners rather than the whole
+   * photo, so the handles are big enough to place. Falls back to the whole photo
+   * when the corners cover too little of it to be a believable card outline.
+   */
+  private framePerspective(): void {
+    const src = this.model!.source!;
+    const t = this.perspTransform;
+    const q = this.corners;
+    const area = (pts: Quad) =>
+      Math.abs(pts.reduce((s, p, i) => {
+        const n = pts[(i + 1) % 4];
+        return s + p[0] * n[1] - n[0] * p[1];
+      }, 0)) / 2;
+    if (!q || area(q) < 0.15 * src.width * src.height) {
+      this.fitInto(t, src, Math.min(0.96, this.homeFill + 0.04));
+      return;
+    }
+    const xs = q.map((p) => p[0]);
+    const ys = q.map((p) => p[1]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs);
+    const y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const { size, top } = this.visible;
+    t.angle = 0;
+    t.center = [(x0 + x1) / 2, (y0 + y1) / 2];
+    // Leave room around the quad so corner handles are never under an edge.
+    t.scale = Math.min(size[0] / (x1 - x0), size[1] / (y1 - y0)) * Math.min(0.84, this.homeFill);
+    t.pan = [size[0] / 2, top + size[1] / 2];
+  }
+
   home(): void {
     if (!this.model?.loaded) return;
     if (this.stage === "perspective") {
-      const src = this.model.source!;
-      this.perspTransform.fit([src.width, src.height], this.size);
-    } else if (!homeView(this.model, this.size)) {
-      this.fitScan();
-      return;
+      this.framePerspective();
+    } else {
+      const { size, top } = this.visible;
+      if (!homeView(this.model, size, this.homeFill)) {
+        this.fitScan();
+        return;
+      }
+      const t = this.model.transform;
+      t.pan = [t.pan[0], t.pan[1] + top];
     }
     this.requestDraw();
     this.events.viewChange();
@@ -189,11 +244,8 @@ export class CardView {
 
   fitScan(): void {
     if (!this.model?.loaded) return;
-    const t = this.transform;
     const img = this.stage === "perspective" ? this.model.source! : this.model.image!;
-    const angle = t.angle;
-    t.fit([img.width, img.height], this.size);
-    t.angle = angle;
+    this.fitInto(this.transform, img, 0.9);
     this.requestDraw();
     this.events.viewChange();
   }
@@ -670,26 +722,29 @@ export class CardView {
       ctx.strokeStyle = CORNER_C;
       ctx.lineWidth = 2;
       ctx.stroke();
+      // Label on the inside of the corner, so it can never be pushed off-screen.
+      const cx = (v[0][0] + v[1][0] + v[2][0] + v[3][0]) / 4;
+      const cy = (v[0][1] + v[1][1] + v[2][1] + v[3][1]) / 4;
+      const dx = cx - p[0], dy = cy - p[1];
+      const d = Math.hypot(dx, dy) || 1;
       ctx.fillStyle = "#ffd54f";
-      ctx.font = "600 10px system-ui, sans-serif";
-      ctx.fillText(labels[i], p[0] + 12, p[1] - 10);
+      ctx.font = "600 11px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const lx = p[0] + (dx / d) * 26, ly = p[1] + (dy / d) * 26;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(0,0,0,0.75)"; // readable over the card's own yellow border
+      ctx.strokeText(labels[i], lx, ly);
+      ctx.fillText(labels[i], lx, ly);
+      ctx.textAlign = "start";
+      ctx.textBaseline = "alphabetic";
     });
   }
 
   private drawHud(): void {
+    if (!this.hud) return;
     const ctx = this.ctx;
-    const touch = coarsePointer();
-    const hints: Record<Stage, string> = touch ? {
-      perspective: "Drag the four corners onto the card's corners · pinch to zoom",
-      rotate: "Twist two fingers to rotate · pinch to zoom · drag to pan",
-      bulk: "Drag a handle to slide its line · pinch to zoom",
-      precision: "Drag either end to pivot a line · pinch to zoom",
-    } : {
-      perspective: "Drag the corners onto the card's corners · wheel: zoom · right-drag: pan",
-      rotate: "Drag: rotate · shift or right-drag: pan · wheel: zoom · alt+wheel: fine rotate",
-      bulk: "Drag a handle to slide its line · alt+drag: whole frame · arrows: nudge",
-      precision: "Drag an end to pivot · shift+drag: slide · ctrl+drag: fine",
-    };
+    const hints = stageHints(coarsePointer());
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,0.8)";
     ctx.shadowBlur = 4;
@@ -730,7 +785,9 @@ export class CardView {
     const size = Math.min(coarsePointer() ? 170 : 220, Math.min(w, hgt) * 0.42);
     const pad = 12;
     const bx = anchorView[0] > w / 2 ? pad : w - size - pad;
-    const by = anchorView[1] > hgt / 2 ? pad + 44 : hgt - size - pad;
+    const by = anchorView[1] > hgt / 2
+      ? pad + (this.hud ? 44 : 0) + this.insets.top
+      : hgt - size - pad - this.insets.bottom;
 
     const t = this.transform;
     const lt = new ViewTransform(t.angle, t.scale * this.loupeZoom, [0, 0], [...t.center]);
@@ -795,4 +852,19 @@ export class CardView {
     ctx.font = "10px ui-monospace, monospace";
     ctx.fillText(`${this.loupeZoom.toFixed(0)}×`, bx + 8, by + 16);
   }
+}
+
+/** One-line instructions for each stage, worded for touch or for a mouse. */
+export function stageHints(touch: boolean): Record<Stage, string> {
+  return touch ? {
+    perspective: "Drag the four corners onto the card's corners · pinch to zoom",
+    rotate: "Twist two fingers to rotate · pinch to zoom · drag to pan",
+    bulk: "Drag a handle to slide its line · pinch to zoom",
+    precision: "Drag either end to pivot a line · pinch to zoom",
+  } : {
+    perspective: "Drag the corners onto the card's corners · wheel: zoom · right-drag: pan",
+    rotate: "Drag: rotate · shift or right-drag: pan · wheel: zoom · alt+wheel: fine rotate",
+    bulk: "Drag a handle to slide its line · alt+drag: whole frame · arrows: nudge",
+    precision: "Drag an end to pivot · shift+drag: slide · ctrl+drag: fine",
+  };
 }

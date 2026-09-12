@@ -38,7 +38,19 @@ To keep it on a phone like an app, with offline use:
 - **iPhone / iPad** — open it in Safari → Share → **Add to Home Screen**.
 - **Android** — open it in Chrome → menu → **Install app**.
 
-<img src="docs/images/phone.png" width="280" alt="The app on a phone">
+On a phone the card fills the screen, with the stages along the bottom. **Take a
+photo** opens the camera, and the photo goes straight to **Deskew** with the
+corners already placed on the detected card. Tap the numbers above the card for
+the full results.
+
+<p>
+  <img src="docs/images/phone-deskew.png" width="240" alt="Deskewing a photo on a phone">
+  <img src="docs/images/phone.png" width="240" alt="Placing lines on a phone">
+  <img src="docs/images/phone-results.png" width="240" alt="Results on a phone">
+</p>
+
+For the best photo: lay the card flat on a plain dark surface, hold the phone
+directly above it so the card fills the frame, and avoid glare.
 
 ### Desktop app
 
@@ -59,9 +71,9 @@ release notes.
 ## Using it
 
 Open the front of the card, work through the stages, then switch to **Back**
-and do the same. Try it first with **⋯ → Try the sample card**.
+and do the same. Try it first with **Try the sample card**.
 
-### 1 · Perspective — only for photos
+### 1 · Deskew — for photos
 
 A phone held even slightly off-parallel skews the card, and perspective does not
 preserve distance ratios, so the percentages drift by a few points with no
@@ -71,7 +83,7 @@ Drag the four corner handles to where the card's straight edges would meet —
 card corners are rounded, so the true corner is a virtual point, and dashed
 extensions of each edge help you line it up. **Flatten card** warps the photo
 to a rectangle before any lines are placed. Scans from a flatbed scanner can
-skip this stage.
+skip this stage. On a phone, **Skip** does that.
 
 ![Perspective correction on a photographed card](docs/images/perspective.png)
 

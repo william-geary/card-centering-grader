@@ -75,7 +75,7 @@ test("perspective on a photo @docs", async ({ page }, info) => {
 
   await page.goto("/");
   await open(page, path, "Open image");
-  await page.getByRole("tab", { name: /Perspective/ }).click();
+  await page.getByRole("tab", { name: /Deskew/ }).click();
   const toPhoto = homography(full, photoCorners)!;
   const card: Quad = [[40, 40], [774, 40], [774, 1064], [40, 1064]];
   await page.evaluate((q) => {
@@ -89,12 +89,41 @@ test("perspective on a photo @docs", async ({ page }, info) => {
 
 test.describe("phone", () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
-  test("phone layout @docs", async ({ page }) => {
+
+  test("phone deskew, bulk and results @docs", async ({ page }, info) => {
+    const png = PNG.sync.read(readFileSync("public/samples/sample_offset.png"));
+    const W = png.width, H = png.height;
+    const full: Quad = [[0, 0], [W, 0], [W, H], [0, H]];
+    const photoCorners: Quad = [[70, 30], [W - 20, 90], [W - 60, H - 20], [30, H - 110]];
+    const photo = warpPerspective({ width: W, height: H, data: new Uint8ClampedArray(png.data) },
+      homography(photoCorners, full)!, W, H);
+    const out = new PNG({ width: W, height: H });
+    out.data = Buffer.from(photo.data);
+    const path = info.outputPath("phone-photo.png");
+    writeFileSync(path, PNG.sync.write(out));
+    const toPhoto = homography(full, photoCorners)!;
+    const card: Quad = [[40, 40], [774, 40], [774, 1064], [40, 1064]];
+
     await page.goto("/");
-    await page.getByRole("button", { name: "Try the sample card" }).click();
-    await expect(page.locator(".big").first()).toHaveText("57.6 / 42.4");
-    await page.getByRole("tab", { name: /Bulk/ }).click();
-    await page.waitForTimeout(300);
+    const chooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Choose a photo" }).click();
+    await (await chooser).setFiles(path);
+    await expect(page.locator(".busy")).toBeHidden();
+    await page.evaluate((q) => {
+      const v = (window as any).cardGrader.view;
+      v.corners = q;
+      v.requestDraw();
+    }, card.map((p) => applyH(toPhoto, p)));
+    await page.waitForTimeout(3500); // let the hint toast fade
+    await page.screenshot({ path: `${OUT}/phone-deskew.png` });
+
+    await page.getByRole("button", { name: "Flatten ✓" }).click();
+    await expect(page.locator(".mobile-nav [data-nav=bulk]")).toHaveClass(/active/);
+    await page.waitForTimeout(3500);
     await page.screenshot({ path: `${OUT}/phone.png` });
+
+    await page.locator(".chip").click();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${OUT}/phone-results.png` });
   });
 });

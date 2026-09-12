@@ -235,3 +235,124 @@ table { border-collapse: collapse; width: 100%; }
   input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
   .pad { grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 40px); }
 }
+
+/* ======================================================= phone layout
+   Set by the app (class "mobile") rather than a media query alone, so the
+   canvas framing and the layout always agree. The card fills the screen
+   between a slim top bar and the bottom navigation. */
+.mobile-only, .mobile-nav, .backdrop, .chip, .actions { display: none; }
+.toast {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 12;
+  max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 10px;
+  background: rgba(22,23,26,0.92); border: 1px solid var(--stroke); font-size: 13px;
+  text-align: center; pointer-events: none;
+}
+
+.app.mobile {
+  --nav-h: 58px;
+  grid-template-rows: auto 1fr auto;
+}
+.app.mobile .desktop-only,
+.app.mobile .statusbar,
+.app.mobile .stage-tabs,
+.app.mobile .brand { display: none !important; }
+.app.mobile .mobile-only { display: revert; }
+.app.mobile .menu-list button.mobile-only { display: flex; }
+.app.mobile .menu-list button.desktop-only { display: none; }
+
+.app.mobile .topbar { flex-wrap: nowrap; gap: 6px; padding: 6px 10px; }
+.app.mobile .topbar button { min-height: 38px; padding: 5px 11px; }
+.app.mobile .ico { display: inline; }
+.app.mobile .lbl { display: none; }
+.app.mobile button { touch-action: manipulation; }
+/* iOS zooms the page into any field with text under 16px. */
+.app.mobile input, .app.mobile select { font-size: 16px; }
+
+.app.mobile .workspace { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.app.mobile .stage-area { grid-template-rows: 1fr; }
+
+/* ---- results chip, over the top of the card */
+.app.mobile .chip:not([hidden]) {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 8;
+  padding: 5px 14px; min-height: 0; border-radius: 12px; white-space: nowrap;
+  background: rgba(22,23,26,0.86); border: 1px solid var(--stroke);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.chip-axes { display: flex; gap: 12px; font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 14px; font-weight: 600; }
+.chip-axes b { color: var(--muted); font-weight: 500; }
+.chip-grades { font-size: 11px; color: var(--muted); }
+.app.mobile .chip.caution { border-color: var(--caution); }
+
+/* ---- the stage's main actions, just above the bottom nav */
+.app.mobile .actions:not([hidden]) {
+  display: flex; gap: 6px; align-items: center;
+  position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 8;
+  padding: 6px; border-radius: 14px;
+  background: rgba(38,40,44,0.92); border: 1px solid var(--stroke);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.app.mobile .actions button { min-height: 44px; padding: 6px 12px; font-size: 14px; }
+.app.mobile .actions .grow { flex: 1; }
+.app.mobile .actions .icon { width: 44px; padding: 0; font-size: 18px; }
+.app.mobile .actions .readout { flex: none; min-width: 52px; text-align: center; font-family: ui-monospace, Consolas, monospace; }
+.app.mobile .toast { bottom: 84px; }
+
+/* ---- bottom navigation */
+.app.mobile .mobile-nav {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  background: var(--panel); border-top: 1px solid var(--stroke);
+  padding: 0 4px env(safe-area-inset-bottom);
+  z-index: 40;
+}
+.mobile-nav button {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: var(--nav-h); border: 0; border-radius: 0; background: transparent;
+  color: var(--muted); font-size: 11px; padding: 4px 0; position: relative;
+}
+.mobile-nav button:hover:not(:disabled), .mobile-nav button:active:not(:disabled) { background: transparent; }
+.mobile-nav button.active { color: var(--text); }
+.mobile-nav button.active::before {
+  content: ""; position: absolute; top: 0; left: 28%; right: 28%; height: 2px;
+  border-radius: 0 0 2px 2px; background: var(--accent-hi);
+}
+.nav-ico { display: grid; place-items: center; height: 24px; }
+
+/* ---- bottom sheet: results, or the current stage's full controls */
+.app.mobile .sidebar {
+  position: fixed; left: 0; right: 0; z-index: 30;
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  max-height: min(72dvh, 620px); border: 0; border-radius: 16px 16px 0 0;
+  box-shadow: 0 -12px 32px rgba(0,0,0,0.5);
+  transform: translateY(calc(100% + var(--nav-h) + 40px)); transition: transform 0.22s ease;
+  visibility: hidden;
+}
+.app.mobile[data-sheet] .sidebar { transform: none; visibility: visible; }
+.app.mobile[data-sheet="results"] .stage-panel,
+.app.mobile[data-sheet="results"] .advanced,
+.app.mobile[data-sheet="options"] .results { display: none; }
+.app.mobile .sheet-head {
+  display: flex; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 2;
+  padding: 14px 14px 8px; background: var(--panel);
+}
+.app.mobile .sheet-head h2 { flex: 1; font-size: 16px; }
+.grabber {
+  position: absolute; top: 5px; left: 50%; transform: translateX(-50%);
+  width: 36px; height: 4px; border-radius: 2px; background: var(--stroke);
+}
+.app.mobile[data-sheet] .backdrop {
+  display: block; position: fixed; left: 0; right: 0; top: 0; z-index: 25;
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  background: rgba(0,0,0,0.35);
+}
+.app.mobile .axes { grid-template-columns: 1fr 1fr; }
+.app.mobile .big { font-size: 22px; }
+.app.mobile .sidebar.no-image .stage-panel { opacity: 1; pointer-events: auto; }
+
+/* ---- empty state on a phone */
+.app.mobile .empty-card { gap: 12px; }
+.app.mobile .empty-card h1 { font-size: 20px; }
+.app.mobile .empty-actions { flex-direction: column; align-items: stretch; }
+.app.mobile .empty-actions button { min-height: 48px; font-size: 16px; }
+.tips { text-align: left; color: var(--muted); font-size: 13px; margin: 0; padding-left: 20px; }
+.tips li + li { margin-top: 3px; }

@@ -55,7 +55,7 @@ xattr -dr com.apple.quarantine "/Applications/Card Centering Grader.app"
 Open the front of a card, place the eight lines, then switch to **Back** and do
 the same. You get Left/Right and Top/Bottom centering live, plus the best grade
 the centering allows for PSA, BGS and CGC. Photographed a card with your phone?
-Use the **Perspective** stage first.
+On a phone, **Take a photo** goes straight to the **Deskew** stage for that.
 
 Full guide: the [README](https://github.com/william-geary/card-centering-grader#readme).
 

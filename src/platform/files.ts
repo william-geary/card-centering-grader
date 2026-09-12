@@ -74,12 +74,16 @@ export function canvasToBlob(canvas: HTMLCanvasElement, type = "image/png"): Pro
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not encode the image."))), type));
 }
 
-/** Ask for a file with the platform's picker. Resolves null if cancelled. */
-export function pickFile(accept: string): Promise<File | null> {
+/**
+ * Ask for a file with the platform's picker. Resolves null if cancelled.
+ * `capture` asks a phone to open its camera instead of the photo library.
+ */
+export function pickFile(accept: string, capture?: "environment" | "user"): Promise<File | null> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = accept;
+    if (capture) input.setAttribute("capture", capture);
     input.style.display = "none";
     let settled = false;
     const done = (f: File | null) => {
